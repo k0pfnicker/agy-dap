@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "agy-dap": {
+      "command": "python",
+      "args": ["run_server.py"],
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}
