@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0",
+  "workspaceRoot": null,
+  "pythonPath": null,
+  "allowOutsideWorkspace": false,
+  "enableEvaluation": false,
+  "includeCodeSnippets": false,
+  "snippetContextLines": 3,
+  "maxConcurrentSessions": 1,
+  "envAllowlist": [],
+  "limits": {
+    "maxStackFrames": 8,
+    "maxVariablesPerScope": 25,
+    "maxVariableDepth": 2,
+    "maxContainerItems": 10,
+    "maxStringLength": 240,
+    "maxOutputLines": 40,
+    "maxOutputLineLength": 300,
+    "maxOutputBufferLines": 500,
+    "maxSnapshotBytes": 16384
+  },
+  "timeouts": {
+    "startupTimeoutMs": 15000,
+    "requestTimeoutMs": 10000,
+    "defaultInspectTimeoutSec": 30.0,
+    "maxInspectTimeoutSec": 120.0,
+    "idleSessionTimeoutSec": 120.0,
+    "cleanupTimeoutSec": 5.0
+  },
+  "profiles": {
+    "pytest": {
+      "runner": "pytest",
+      "pythonPath": null,
+      "module": "pytest",
+      "cwd": null,
+      "args": ["-q", "-s", "--no-header", "--tb=short"],
+      "env": {},
+      "justMyCode": true,
+      "stopOnUncaughtException": true,
+      "stopOnRaisedException": false
+    }
+  }
+}
