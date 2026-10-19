@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agy-dap"
+version = "1.0.0"
+description = "Hypothesis-driven Debug Adapter Protocol (DAP) MCP Plugin for Antigravity CLI"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Senior Software Architect" }
+]
+dependencies = [
+    "mcp>=1.0.0",
+    "debugpy>=1.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+agy-dap = "agy_dap.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit", "tests/integration"]
+norecursedirs = ["fixtures", ".venv", ".git"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+markers = [
+    "integration: real end-to-end integration tests with debugpy and pytest",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B"]
+ignore = ["E501", "W293"]
