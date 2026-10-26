@@ -43,7 +43,7 @@ def create_server(
 
     app = MCPServer(
         name="agy-dap",
-        version="1.0.0",
+        version="1.1.0",
         description=(
             "Hypothesis-driven Debug Adapter Protocol (DAP) plugin for Antigravity CLI. "
             "Runs local pytest tests under debugpy to capture compact runtime snapshots at breakpoints or exceptions."

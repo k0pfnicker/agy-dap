@@ -4,18 +4,34 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agy-dap"
-version = "1.0.0"
+version = "1.1.0"
 description = "Hypothesis-driven Debug Adapter Protocol (DAP) MCP Plugin for Antigravity CLI"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-    { name = "Senior Software Architect" }
+    { name = "k0pfnicker" }
+]
+keywords = ["mcp", "dap", "debugpy", "pytest", "debugging", "antigravity", "agent"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     "mcp>=1.0.0",
     "debugpy>=1.8.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/k0pfnicker/agy-dap"
+Repository = "https://github.com/k0pfnicker/agy-dap.git"
+Issues = "https://github.com/k0pfnicker/agy-dap/issues"
+Changelog = "https://github.com/k0pfnicker/agy-dap/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
