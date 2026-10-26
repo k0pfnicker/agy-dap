@@ -28,4 +28,17 @@ class DebugAdapterBase(ABC):
         test_id: str,
         workspace_root: str,
     ) -> dict[str, Any]:
-        """Build the adapter-specific DAP 'launch' request arguments."""
+        """Build the adapter-specific DAP 'launch' (or 'attach') request arguments."""
+
+    async def prepare_launch_args(
+        self,
+        profile: ProfileConfig,
+        test_id: str,
+        workspace_root: str,
+    ) -> dict[str, Any]:
+        """Prepare and return DAP launch/attach arguments (e.g. spawning VSTest host for attach adapters)."""
+        return self.build_launch_args(profile, test_id, workspace_root)
+
+    async def cleanup_auxiliary_processes(self) -> None:
+        """Clean up any auxiliary processes spawned during prepare_launch_args (e.g. dotnet test host)."""
+        return None

@@ -1,7 +1,7 @@
 # agy-dap — Hypothesengesteuertes Debug Adapter Protocol (DAP) Plugin für Antigravity CLI
 
-[![Version](https://img.shields.io/badge/version-1.2.0-purple.svg)](#12-getestete-versionen-plattformen--ci)
-[![Tests](https://img.shields.io/badge/tests-40%20passed-brightgreen)](#12-getestete-versionen-plattformen--ci)
+[![Version](https://img.shields.io/badge/version-1.3.0-purple.svg)](#12-getestete-versionen-plattformen--ci)
+[![Tests](https://img.shields.io/badge/tests-41%20passed-brightgreen)](#12-getestete-versionen-plattformen--ci)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)](#12-getestete-versionen-plattformen--ci)
 [![MCP](https://img.shields.io/badge/MCP-compatible-orange)](https://modelcontextprotocol.io)
@@ -358,7 +358,7 @@ Anhand von `subtotal = 100.0`, `discount = 15.0` und `running_total = 115.0` in 
   }
   ```
 - **Intelligente Funktionskörper-Auflösung:** [`src/agy_dap/symbols.py`](src/agy_dap/symbols.py) implementiert den `CompositeSymbolResolver`, der den schnellen `PythonAstSymbolResolver` mit dem `AgyLspSymbolResolver` (Anbindung an das Companion-Plugin [**agy-lsp**](https://github.com/k0pfnicker/agy-lsp)) kombiniert. Statt auf der `def`-Kopfzeile (die bereits beim Modul-Import ausgeführt wird) landet der Breakpoint automatisch auf der **ersten ausführbaren Anweisung im Funktionskörper** (nach etwaigen Docstrings) plus optionalem `line_offset`.
-- **Integrierte Runner-Profile (`pytest`, `unittest`, `python_module`):** Neben `pytest` unterstützt `agy-dap` standardmäßig `unittest`-Testsuites (`profile="unittest"`) sowie direkte Python-Skripte und Module (`profile="python_module"`).
+- **Integrierte Runner-Profile (`pytest`, `unittest`, `python_module`, `dotnet_test`):** Neben `pytest` unterstützt `agy-dap` standardmäßig `unittest`-Testsuites (`profile="unittest"`), direkte Python-Skripte und Module (`profile="python_module"`) sowie `.NET`-Tests (`profile="dotnet_test"`, via `VSTEST_HOST_DEBUG=1` Auto-Attach mit `netcoredbg --interpreter=vscode` und `CSharpSymbolResolver` für `.cs`-Symbol-Breakpoints).
 
 ---
 

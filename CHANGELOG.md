@@ -5,6 +5,13 @@ All notable changes to **agy-dap** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-10-26
+
+### Added
+- **`.NET` (`dotnet test`) Debugging via `NetCoreDbgAdapter` (`profile="dotnet_test"`):** Added `NetCoreDbgAdapter` (`src/agy_dap/adapters/netcoredbg.py`), `validate_dotnet_test_selector` (`src/agy_dap/utils/paths.py`), and DAP `attach` handshake support in `DapClient`. Automatically launches `dotnet test --filter <TestFilter>` with `VSTEST_HOST_DEBUG=1`, parses the suspended `testhost.dll` process ID (`Process Id: <PID>`), attaches `netcoredbg --interpreter=vscode` over DAP stdio, and cleans up both the `testhost` and `dotnet test` process trees on completion.
+- **C# Symbol Breakpoint Resolution (`CSharpSymbolResolver`):** Extended `CompositeSymbolResolver` (`src/agy_dap/symbols.py`) with `CSharpSymbolResolver` so symbol breakpoints in `.cs` files (`{"file": "CheckoutService.cs", "symbol": "CheckoutService.CalculateTotal"}`) resolve directly to the first executable statement inside the method body even when no C# LSP server is running.
+- **Extended `debug_doctor` for `.NET` & `netcoredbg`:** `debug_doctor(profile="dotnet_test")` probes `dotnet --version` and `netcoredbg --version` and returns OS-specific installation instructions when missing.
+
 ## [1.2.0] - 2026-10-26
 
 ### Added

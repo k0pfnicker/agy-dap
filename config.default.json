@@ -60,6 +60,17 @@
       "justMyCode": true,
       "stopOnUncaughtException": true,
       "stopOnRaisedException": false
+    },
+    "dotnet_test": {
+      "runner": "dotnet_test",
+      "pythonPath": null,
+      "module": "dotnet",
+      "cwd": null,
+      "args": ["test"],
+      "env": {},
+      "justMyCode": true,
+      "stopOnUncaughtException": true,
+      "stopOnRaisedException": false
     }
   }
 }

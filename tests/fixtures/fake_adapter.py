@@ -52,6 +52,7 @@ def main() -> None:
     mode = os.environ.get("FAKE_DAP_MODE", "normal")
     seq_counter = 1
     pending_launch_req_seq: int | None = None
+    pending_launch_cmd: str = "launch"
     stop_count = 0
 
     def next_seq() -> int:
@@ -96,14 +97,14 @@ def main() -> None:
                 }
             )
 
-        elif cmd == "launch":
+        elif cmd in ("launch", "attach"):
             if mode == "fail_launch":
                 send_msg(
                     {
                         "seq": next_seq(),
                         "type": "response",
                         "request_seq": req_seq,
-                        "command": "launch",
+                        "command": cmd,
                         "success": False,
                         "message": "Simulated launch failure in adapter.",
                     }
@@ -121,8 +122,9 @@ def main() -> None:
                     }
                 )
 
-            # Hold launch response until configurationDone (like debugpy)
+            # Hold launch/attach response until configurationDone (like debugpy and netcoredbg)
             pending_launch_req_seq = req_seq
+            pending_launch_cmd = cmd
             send_msg({"seq": next_seq(), "type": "event", "event": "initialized", "body": {}})
 
         elif cmd == "setBreakpoints":
@@ -193,7 +195,7 @@ def main() -> None:
                         "seq": next_seq(),
                         "type": "response",
                         "request_seq": pending_launch_req_seq,
-                        "command": "launch",
+                        "command": pending_launch_cmd,
                         "success": True,
                         "body": {},
                     }

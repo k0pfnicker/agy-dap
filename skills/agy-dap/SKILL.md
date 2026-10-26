@@ -30,7 +30,7 @@ This skill guides the agent in using `agy-dap` MCP tools to inspect real runtime
    - Always check `breakpoints[0].actual_line` and `verified` in the returned snapshot.
    - Request **only the specific variable names** needed to test your hypothesis via `locals=["subtotal", "discount", "running_total"]`.
 3. **Prefer One-Shot `debug_inspect` Over Multi-Step Stepping**:
-   Call `debug_inspect` first (supports `profile="pytest"`, `"unittest"`, or `"python_module"`):
+   Call `debug_inspect` first (supports `profile="pytest"`, `"unittest"`, `"python_module"`, or `"dotnet_test"`):
    ```json
    {
      "profile": "pytest",

@@ -467,7 +467,10 @@ class DapClient:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + startup_timeout
 
-        _, launch_fut = await self.send_request_nowait("launch", launch_args)
+        req_cmd = "attach" if launch_args.get("request") == "attach" else "launch"
+        if isinstance(launch_args.get("processId"), int):
+            self.debuggee_pid = int(launch_args["processId"])
+        _, launch_fut = await self.send_request_nowait(req_cmd, launch_args)
 
         # Wait for initialized event OR early launch failure / transport close
         init_wait = asyncio.create_task(self._initialized_event.wait())

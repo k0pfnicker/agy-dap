@@ -9,6 +9,7 @@ from typing import Any, Callable, Optional
 
 from agy_dap.adapters.base import DebugAdapterBase
 from agy_dap.adapters.debugpy import DebugpyAdapter
+from agy_dap.adapters.netcoredbg import NetCoreDbgAdapter
 from agy_dap.config import PluginConfig, ProfileConfig
 from agy_dap.dap.client import DapClient
 from agy_dap.errors import DapPluginError, ErrorCode
@@ -116,7 +117,7 @@ class DebugSession:
                 self.lifecycle.transition_to(SessionState.STARTING)
 
                 # Validate launch args before spawning adapter process
-                launch_args = self.adapter.build_launch_args(
+                self.adapter.build_launch_args(
                     profile=self.profile,
                     test_id=self.test_id,
                     workspace_root=self.workspace_root,
@@ -124,6 +125,12 @@ class DebugSession:
 
                 self.proc = await self.adapter.spawn_adapter_process(self.profile)
                 assert self.proc.stdin and self.proc.stdout
+
+                launch_args = await self.adapter.prepare_launch_args(
+                    profile=self.profile,
+                    test_id=self.test_id,
+                    workspace_root=self.workspace_root,
+                )
 
                 self.client = DapClient(
                     reader=self.proc.stdout,
@@ -454,6 +461,7 @@ class DebugSession:
                 debuggee_pid=debuggee_pid,
                 timeout_sec=self.config.timeouts.cleanupTimeoutSec,
             )
+            await self.adapter.cleanup_auxiliary_processes()
 
             self.lifecycle.state = SessionState.TERMINATED
             self._cleanup_result = {
@@ -500,6 +508,7 @@ class SessionManager:
         adapter_factory: Optional[Callable[[PluginConfig], DebugAdapterBase]] = None,
     ) -> None:
         self.config = config
+        self._custom_adapter_factory = adapter_factory
         self._adapter_factory = adapter_factory or DebugpyAdapter
         self._active_sessions: dict[str, DebugSession] = {}
         self._terminated_cleanup_records: dict[str, dict[str, Any]] = {}
@@ -556,7 +565,12 @@ class SessionManager:
             profile = self.config.profiles[profile_name]
             ws_root = self.config.workspaceRoot or find_workspace_root()
             session_id = f"sess_{secrets.token_hex(6)}"
-            adapter = self._adapter_factory(self.config)
+            if self._custom_adapter_factory is not None:
+                adapter = self._custom_adapter_factory(self.config)
+            elif profile.runner == "dotnet_test":
+                adapter = NetCoreDbgAdapter(self.config)
+            else:
+                adapter = DebugpyAdapter(self.config)
 
             session = DebugSession(
                 session_id=session_id,

@@ -43,10 +43,10 @@ def create_server(
 
     app = MCPServer(
         name="agy-dap",
-        version="1.2.0",
+        version="1.3.0",
         description=(
             "Hypothesis-driven Debug Adapter Protocol (DAP) plugin for Antigravity CLI. "
-            "Runs local pytest, unittest, or Python module targets under debugpy to capture compact runtime snapshots at line or symbol breakpoints."
+            "Runs local pytest, unittest, Python module, and .NET ('dotnet test' via netcoredbg) targets to capture compact runtime snapshots at line or symbol breakpoints."
         ),
     )
 
@@ -54,7 +54,7 @@ def create_server(
     @app.tool(
         name="debug_doctor",
         description=(
-            "Check workspace, selected Python interpreter, debugpy, pytest, profiles, and configuration. "
+            "Check workspace, selected Python interpreter, debugpy, pytest, dotnet, netcoredbg, profiles, and configuration. "
             "Returns availability and concrete remediation steps without modifying the environment."
         ),
     )
@@ -72,8 +72,8 @@ def create_server(
     @app.tool(
         name="debug_inspect",
         description=(
-            "Primary one-shot debugging investigation tool. Launches a target under debugpy using a named profile "
-            "('pytest', 'unittest', or 'python_module'), configures line or symbol breakpoints "
+            "Primary one-shot debugging investigation tool. Launches a target under debugpy or netcoredbg using a named profile "
+            "('pytest', 'unittest', 'python_module', or 'dotnet_test'), configures line or symbol breakpoints "
             "({'file': ..., 'line': ...} or {'file': ..., 'symbol': ..., 'line_offset': ...}), waits for the first stop "
             "(breakpoint or exception), returns a compact runtime snapshot (stack, filtered locals, output tail), and reliably cleans up."
         ),
@@ -109,8 +109,8 @@ def create_server(
     @app.tool(
         name="debug_start",
         description=(
-            "Start a stateful debugging session for multi-step investigation. Launches the target under debugpy "
-            "('pytest', 'unittest', or 'python_module'), stops at the first line/symbol breakpoint or exception, "
+            "Start a stateful debugging session for multi-step investigation. Launches the target under debugpy or netcoredbg "
+            "('pytest', 'unittest', 'python_module', or 'dotnet_test'), stops at the first line/symbol breakpoint or exception, "
             "returns the session_id and initial snapshot, and keeps the session paused for follow-up debug_snapshot, debug_continue, or debug_stop calls."
         ),
     )

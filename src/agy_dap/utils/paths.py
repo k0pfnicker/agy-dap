@@ -355,3 +355,88 @@ def validate_python_module_selector(
             details={"selector": selector},
         )
     return {"mode": "module", "target": cleaned}
+
+
+# Safe VSTest filter expression (identifiers, dots, ~, =, !, |, &, parentheses)
+_VSTEST_FILTER_RE = re.compile(r"^[A-Za-z0-9_.\-~=!|&()]+$")
+
+
+def validate_dotnet_test_selector(
+    selector: str,
+    workspace_root: str | Path,
+    allow_outside: bool = False,
+) -> dict[str, Optional[str]]:
+    """Validate a dotnet test selector and return {'project': Optional[str], 'filter': Optional[str]}.
+
+    Accepts:
+    - '<project.csproj|solution.sln>::<TestFilter>' (e.g. 'Tests/MyTests.csproj::CheckoutTests.TestDiscount')
+    - '<project.csproj|solution.sln>' (runs all tests in project)
+    - '<TestFilter>' (e.g. 'CheckoutTests.TestDiscount' or 'FullyQualifiedName~CheckoutTests.TestDiscount')
+    """
+    cleaned = _validate_non_empty_selector(selector)
+
+    project_part: Optional[str] = None
+    filter_part: Optional[str] = None
+
+    if "::" in cleaned:
+        parts = cleaned.split("::", 1)
+        project_part = parts[0].strip()
+        filter_part = parts[1].strip()
+        if not project_part or not filter_part:
+            raise DapPluginError(
+                code=ErrorCode.INVALID_TEST_SELECTOR,
+                message=f"Invalid dotnet_test selector '{selector}': both project and filter around '::' must be non-empty.",
+                retryable=False,
+                details={"selector": selector},
+            )
+    elif cleaned.lower().endswith((".csproj", ".sln", ".slnx", ".fsproj", ".dll")) or "/" in cleaned or "\\" in cleaned:
+        project_part = cleaned
+    else:
+        filter_part = cleaned
+
+    resolved_project: Optional[str] = None
+    if project_part is not None:
+        if project_part.startswith("-"):
+            raise DapPluginError(
+                code=ErrorCode.INVALID_TEST_SELECTOR,
+                message=f"Invalid dotnet_test project '{project_part}': CLI options are forbidden.",
+                retryable=False,
+                details={"selector": selector},
+            )
+        resolved_project = ensure_workspace_path(
+            project_part,
+            workspace_root,
+            allow_outside=allow_outside,
+            must_exist=False,
+        )
+        p = Path(resolved_project)
+        if p.suffix.lower() not in (".csproj", ".sln", ".slnx", ".fsproj", ".dll"):
+            raise DapPluginError(
+                code=ErrorCode.INVALID_TEST_SELECTOR,
+                message=(
+                    f"Invalid dotnet_test project '{project_part}': must be a .csproj, .sln, .slnx, .fsproj, or .dll file."
+                ),
+                retryable=False,
+                details={"selector": selector, "project": project_part},
+            )
+        if not p.is_file():
+            raise DapPluginError(
+                code=ErrorCode.INVALID_TEST_SELECTOR,
+                message=f".NET test project file '{project_part}' does not exist inside workspace.",
+                retryable=False,
+                details={"selector": selector, "resolved_project": resolved_project},
+            )
+
+    if filter_part is not None:
+        if filter_part.startswith("-") or not _VSTEST_FILTER_RE.match(filter_part):
+            raise DapPluginError(
+                code=ErrorCode.INVALID_TEST_SELECTOR,
+                message=(
+                    f"Invalid VSTest filter '{filter_part}' in selector '{selector}'. "
+                    "CLI flags and shell characters are forbidden."
+                ),
+                retryable=False,
+                details={"selector": selector, "filter": filter_part},
+            )
+
+    return {"project": resolved_project, "filter": filter_part}

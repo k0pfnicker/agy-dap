@@ -109,6 +109,14 @@ class PluginConfig:
                 stopOnUncaughtException=True,
                 stopOnRaisedException=False,
             ),
+            "dotnet_test": ProfileConfig(
+                runner="dotnet_test",
+                module="dotnet",
+                args=["test"],
+                justMyCode=True,
+                stopOnUncaughtException=True,
+                stopOnRaisedException=False,
+            ),
         }
     )
 
@@ -216,7 +224,7 @@ class PluginConfig:
                 retryable=False,
             )
 
-        supported_runners = {"pytest", "unittest", "python_module"}
+        supported_runners = {"pytest", "unittest", "python_module", "dotnet_test"}
         for name, prof in self.profiles.items():
             if prof.runner not in supported_runners:
                 raise DapPluginError(
@@ -400,12 +408,20 @@ def _apply_dict_to_config(cfg: PluginConfig, data: dict[str, Any]) -> None:
                     raise ValueError(f"Profile '{name}' must be an object")
                 runner_val = str(pdata.get("runner", "pytest"))
                 default_mod = (
-                    "unittest" if runner_val == "unittest" else ("" if runner_val == "python_module" else "pytest")
+                    "unittest"
+                    if runner_val == "unittest"
+                    else (
+                        "" if runner_val == "python_module" else ("dotnet" if runner_val == "dotnet_test" else "pytest")
+                    )
                 )
                 default_args = (
                     ["-v"]
                     if runner_val == "unittest"
-                    else ([] if runner_val == "python_module" else ["-q", "-s", "--no-header", "--tb=short"])
+                    else (
+                        []
+                        if runner_val == "python_module"
+                        else (["test"] if runner_val == "dotnet_test" else ["-q", "-s", "--no-header", "--tb=short"])
+                    )
                 )
                 args_val = pdata.get("args", default_args)
                 if not isinstance(args_val, list) or not all(isinstance(x, str) for x in args_val):

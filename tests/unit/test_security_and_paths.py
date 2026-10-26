@@ -179,6 +179,174 @@ def test_default_profiles_and_debugpy_build_launch_args(test_config) -> None:
     assert "program" not in m_launch
 
 
+@pytest.mark.asyncio
+async def test_dotnet_test_selector_and_netcoredbg_adapter(tmp_path: Path) -> None:
+    """Verify validate_dotnet_test_selector, CSharpSymbolResolver, and NetCoreDbgAdapter VSTEST_HOST_DEBUG handshake."""
+    from agy_dap.adapters.netcoredbg import NetCoreDbgAdapter, parse_vstest_host_pid
+    from agy_dap.config import PluginConfig
+    from agy_dap.symbols import CompositeSymbolResolver
+    from agy_dap.utils.paths import validate_dotnet_test_selector
+
+    # Create a dummy C# test project structure inside tmp_path
+    cs_dir = tmp_path / "SampleDotnetTests"
+    cs_dir.mkdir()
+    csproj = cs_dir / "SampleDotnetTests.csproj"
+    csproj.write_text('<Project Sdk="Microsoft.NET.Sdk"></Project>', encoding="utf-8")
+    cs_file = cs_dir / "CheckoutService.cs"
+    cs_file.write_text(
+        "namespace SampleDotnetTests;\n"
+        "\n"
+        "public class CheckoutService\n"
+        "{\n"
+        "    public decimal CalculateTotal(decimal subtotal, decimal discountRate)\n"
+        "    {\n"
+        "        // Compute discount\n"
+        "        decimal discount = subtotal * discountRate;\n"
+        "        decimal runningTotal = subtotal + discount;\n"
+        "        return runningTotal;\n"
+        "    }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    ws = str(tmp_path)
+
+    # 1. Selector with .csproj and filter
+    sel1 = validate_dotnet_test_selector(
+        "SampleDotnetTests/SampleDotnetTests.csproj::CheckoutTests.TestDiscount",
+        ws,
+    )
+    assert sel1["project"] is not None and sel1["project"].endswith("SampleDotnetTests.csproj")
+    assert sel1["filter"] == "CheckoutTests.TestDiscount"
+
+    # 2. Standalone filter selector
+    sel2 = validate_dotnet_test_selector("FullyQualifiedName~CheckoutTests.TestDiscount", ws)
+    assert sel2["project"] is None
+    assert sel2["filter"] == "FullyQualifiedName~CheckoutTests.TestDiscount"
+
+    # 3. CLI flag injection and path traversal blocked
+    for bad in ("--logger:trx", "-v", "SampleDotnetTests/SampleDotnetTests.csproj::--evil"):
+        with pytest.raises(DapPluginError) as exc_info:
+            validate_dotnet_test_selector(bad, ws)
+        assert exc_info.value.code == ErrorCode.INVALID_TEST_SELECTOR
+
+    with pytest.raises(DapPluginError) as exc_out:
+        validate_dotnet_test_selector("../Outside.csproj::TestFoo", ws)
+    assert exc_out.value.code == ErrorCode.PATH_OUTSIDE_WORKSPACE
+
+    # 4. CSharpSymbolResolver resolves CalculateTotal to line 8 (first executable line after '{' and comment)
+    resolver = CompositeSymbolResolver(workspace_root=ws)
+    cs_loc = await resolver.resolve_symbol(
+        "CheckoutService.CalculateTotal",
+        context_file="SampleDotnetTests/CheckoutService.cs",
+    )
+    assert cs_loc is not None
+    assert cs_loc.declaration_line == 5
+    assert cs_loc.line == 8
+
+    # 5. VSTest output PID parser and NetCoreDbgAdapter build_launch_args
+    sample_stdout = (
+        "Microsoft (R) Test Execution Command Line Tool Version 17.11.0\n"
+        "Host debugging is enabled. Please attach debugger to testhost process to continue.\n"
+        "Process Id: 42424, Name: dotnet\n"
+    )
+    assert parse_vstest_host_pid(sample_stdout) == 42424
+
+    cfg = PluginConfig(workspaceRoot=ws)
+    cfg.validate()
+    assert "dotnet_test" in cfg.profiles
+    net_adapter = NetCoreDbgAdapter(cfg)
+    launch_cfg = net_adapter.build_launch_args(
+        cfg.profiles["dotnet_test"],
+        "SampleDotnetTests/SampleDotnetTests.csproj::CheckoutTests.TestDiscount",
+        ws,
+    )
+    assert launch_cfg["type"] == "coreclr"
+    assert "--filter" in launch_cfg["dotnet_test_args"]
+
+    # 6. Simulate VSTEST_HOST_DEBUG=1 subprocess in prepare_launch_args and full DAP attach inspection
+    import sys
+
+    fake_dotnet_script = tmp_path / "fake_dotnet.py"
+    fake_dotnet_script.write_text(
+        "import sys, time\n"
+        "print('Host debugging is enabled. Please attach debugger to testhost process to continue.', flush=True)\n"
+        "print('Process Id: 49999, Name: dotnet', flush=True)\n"
+        "time.sleep(0.2)\n",
+        encoding="utf-8",
+    )
+
+    class SimulatedNetCoreDbgAdapter(NetCoreDbgAdapter):
+        async def spawn_adapter_process(self, profile):
+            import asyncio
+
+            fake_script = Path(__file__).parents[1] / "fixtures" / "fake_adapter.py"
+            env = os.environ.copy()
+            env["FAKE_DAP_MODE"] = "normal"
+            return await asyncio.create_subprocess_exec(
+                sys.executable,
+                str(fake_script),
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=ws,
+                env=env,
+            )
+
+        async def prepare_launch_args(self, profile, test_id, workspace_root):
+            # Spawn our fake_dotnet_script via python and parse its emitted Process Id
+            import asyncio
+
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable,
+                str(fake_dotnet_script),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                cwd=ws,
+            )
+            self._vstest_proc = proc
+            assert proc.stdout is not None
+            while True:
+                raw = await proc.stdout.readline()
+                if not raw:
+                    break
+                pid = parse_vstest_host_pid(raw.decode("utf-8", errors="replace"))
+                if pid is not None:
+                    self._testhost_pid = pid
+                    break
+            return {
+                "name": "agy-dap:dotnet_test",
+                "type": "coreclr",
+                "request": "attach",
+                "processId": self._testhost_pid,
+                "justMyCode": True,
+                "cwd": ws,
+            }
+
+    from agy_dap.server import create_server
+    from agy_dap.tools.doctor import debug_doctor_tool
+    from agy_dap.tools.inspect import debug_inspect_tool
+
+    _, manager, _ = create_server(cfg, adapter_factory=lambda c: SimulatedNetCoreDbgAdapter(c))
+    snap = await debug_inspect_tool(
+        manager=manager,
+        profile="dotnet_test",
+        test_id="SampleDotnetTests/SampleDotnetTests.csproj::CheckoutTests.TestDiscount",
+        breakpoint={"file": "SampleDotnetTests/CheckoutService.cs", "symbol": "CheckoutService.CalculateTotal"},
+        locals=["subtotal", "discount"],
+    )
+    assert snap["state"] == "STOPPED"
+    assert snap["breakpoints"][0]["requested_line"] == 8
+    assert snap["breakpoints"][0]["requested_symbol"] == "CheckoutService.CalculateTotal"
+    assert snap["breakpoints"][0]["symbol_provider"] == "csharp-ast"
+    assert snap["session_terminated"] is True
+
+    # 7. Verify debug_doctor reports dotnet_test checks
+    doc = await debug_doctor_tool(config=cfg, profile="dotnet_test")
+    assert "dotnet" in doc["checks"]
+    assert "netcoredbg" in doc["checks"]
+
+
 def test_sanitized_env_filters_host_secrets() -> None:
     """Verify build_sanitized_env excludes arbitrary host secrets and keeps allowlisted platform vars."""
     mock_env = {

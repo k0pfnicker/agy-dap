@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -221,13 +222,88 @@ class AgyLspSymbolResolver:
                 pass
 
 
+class CSharpSymbolResolver:
+    """Deterministic structural symbol resolver for C# (.cs) files when a C# LSP is not running."""
+
+    _METHOD_OR_CLASS_RE = re.compile(
+        r"^\s*(?:(?:public|private|protected|internal|static|virtual|override|async|sealed|partial|abstract)\s+)*"
+        r"(?:class|struct|record|interface|[A-Za-z_][A-Za-z0-9_<>,.\[\]?]*)\s+"
+        r"([A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^>]+>)?\s*(?:\(|{|\:|$)"
+    )
+
+    def __init__(self, workspace_root: str, allow_outside: bool = False) -> None:
+        self.workspace_root = normalize_path(workspace_root)
+        self.allow_outside = allow_outside
+
+    async def resolve_symbol(
+        self,
+        symbol: str,
+        context_file: Optional[str] = None,
+    ) -> Optional[ResolvedSymbolLocation]:
+        cleaned = symbol.strip()
+        if not cleaned or not context_file:
+            return None
+
+        resolved_path = ensure_workspace_path(
+            context_file,
+            self.workspace_root,
+            allow_outside=self.allow_outside,
+            must_exist=True,
+        )
+        p = Path(resolved_path)
+        if p.suffix.lower() != ".cs":
+            return None
+
+        try:
+            lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+        except Exception:
+            return None
+
+        parts = [part.strip() for part in cleaned.replace("::", ".").split(".") if part.strip()]
+        if not parts:
+            return None
+        target_name = parts[-1]
+
+        for idx, raw_line in enumerate(lines):
+            stripped = raw_line.strip()
+            if not stripped or stripped.startswith("//") or stripped.startswith("["):
+                continue
+            m = self._METHOD_OR_CLASS_RE.match(raw_line)
+            if m and m.group(1) == target_name:
+                decl_line = idx + 1
+                exec_line = decl_line
+                for look_ahead in range(idx + 1, min(len(lines), idx + 15)):
+                    cand = lines[look_ahead].strip()
+                    if (
+                        not cand
+                        or cand == "{"
+                        or cand.startswith("//")
+                        or cand.startswith("/*")
+                        or cand.startswith("*")
+                    ):
+                        continue
+                    exec_line = look_ahead + 1
+                    break
+                return ResolvedSymbolLocation(
+                    symbol=cleaned,
+                    file=resolved_path,
+                    line=exec_line,
+                    declaration_line=decl_line,
+                    character=1,
+                    end_line=exec_line,
+                    provider="csharp-ast",
+                )
+        return None
+
+
 class CompositeSymbolResolver:
-    """Combines fast Python AST resolution for `.py` files with `agy-lsp` multi-language resolution."""
+    """Combines fast Python/C# AST resolution with `agy-lsp` multi-language resolution."""
 
     def __init__(self, workspace_root: str, allow_outside: bool = False) -> None:
         self.workspace_root = normalize_path(workspace_root)
         self.allow_outside = allow_outside
         self.ast_resolver = PythonAstSymbolResolver(workspace_root=self.workspace_root, allow_outside=allow_outside)
+        self.csharp_resolver = CSharpSymbolResolver(workspace_root=self.workspace_root, allow_outside=allow_outside)
         self.lsp_resolver = AgyLspSymbolResolver(workspace_root=self.workspace_root, allow_outside=allow_outside)
 
     async def resolve_symbol(
@@ -246,5 +322,11 @@ class CompositeSymbolResolver:
         if lsp_loc is not None:
             return lsp_loc
 
-        # 3. Fallback to AST resolver if not tried yet
+        # 3. For C# files, fallback to deterministic CSharpSymbolResolver
+        if context_file and str(context_file).lower().endswith(".cs"):
+            cs_loc = await self.csharp_resolver.resolve_symbol(symbol, context_file=context_file)
+            if cs_loc is not None:
+                return cs_loc
+
+        # 4. Fallback to AST resolver if not tried yet
         return await self.ast_resolver.resolve_symbol(symbol, context_file=context_file)
