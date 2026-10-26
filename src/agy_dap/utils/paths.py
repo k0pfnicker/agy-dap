@@ -241,3 +241,117 @@ def validate_pytest_selector(
         canonical_selector = resolved_file
     _ = rel_file
     return canonical_selector, resolved_file
+
+
+_DOTTED_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
+
+
+def _validate_non_empty_selector(selector: str) -> str:
+    if not selector or not isinstance(selector, str):
+        raise DapPluginError(
+            code=ErrorCode.INVALID_TEST_SELECTOR,
+            message="Test selector must be a non-empty string.",
+            retryable=False,
+        )
+    cleaned = selector.strip()
+    if not cleaned:
+        raise DapPluginError(
+            code=ErrorCode.INVALID_TEST_SELECTOR,
+            message="Test selector must not be whitespace only.",
+            retryable=False,
+        )
+    if cleaned.startswith("-"):
+        raise DapPluginError(
+            code=ErrorCode.INVALID_TEST_SELECTOR,
+            message=f"Invalid test selector '{selector}': CLI options (leading '-') are forbidden.",
+            retryable=False,
+            details={"selector": selector},
+        )
+    if any(ch in cleaned for ch in ("\x00", "\r", "\n", "\t")):
+        raise DapPluginError(
+            code=ErrorCode.INVALID_TEST_SELECTOR,
+            message="Test selector contains forbidden control characters.",
+            retryable=False,
+            details={"selector": selector},
+        )
+    return cleaned
+
+
+def validate_unittest_selector(
+    selector: str,
+    workspace_root: str | Path,
+    allow_outside: bool = False,
+) -> tuple[list[str], Optional[str]]:
+    """Validate a unittest selector and return (unittest_cli_args, optional_resolved_file).
+
+    Accepts either:
+    - Pytest-style path selector: 'tests/test_checkout.py::TestCheckout::test_discount'
+      or 'tests/test_checkout.py'
+    - Standard unittest dotted path: 'tests.test_checkout.TestCheckout.test_discount'
+    """
+    cleaned = _validate_non_empty_selector(selector)
+
+    if "::" in cleaned or cleaned.endswith(".py") or "/" in cleaned or "\\" in cleaned:
+        _, resolved_file = validate_pytest_selector(cleaned, workspace_root, allow_outside=allow_outside)
+        parts = cleaned.split("::")
+        node_parts = parts[1:]
+        rel_posix = to_workspace_relative(resolved_file, workspace_root)
+        if rel_posix.endswith(".py"):
+            rel_posix = rel_posix[:-3]
+        dotted_module = rel_posix.replace("/", ".").strip(".")
+        if node_parts:
+            dotted_target = ".".join([dotted_module, *node_parts]) if dotted_module else ".".join(node_parts)
+            return [dotted_target], resolved_file
+        return ["discover", "-s", str(Path(resolved_file).parent), "-p", Path(resolved_file).name], resolved_file
+
+    if not _DOTTED_IDENTIFIER_RE.match(cleaned):
+        raise DapPluginError(
+            code=ErrorCode.INVALID_TEST_SELECTOR,
+            message=(
+                f"Invalid unittest selector '{selector}'. Expected dotted module/test path "
+                "(e.g. 'tests.test_mod.TestClass.test_method') or file selector ('tests/test_mod.py::TestClass::test_method')."
+            ),
+            retryable=False,
+            details={"selector": selector},
+        )
+    return [cleaned], None
+
+
+def validate_python_module_selector(
+    selector: str,
+    workspace_root: str | Path,
+    allow_outside: bool = False,
+) -> dict[str, str]:
+    """Validate a python_module / script target and return {'mode': 'program'|'module', 'target': ...}."""
+    cleaned = _validate_non_empty_selector(selector)
+
+    if cleaned.endswith(".py") or "/" in cleaned or "\\" in cleaned:
+        resolved_file = ensure_workspace_path(cleaned, workspace_root, allow_outside=allow_outside, must_exist=False)
+        resolved_path = Path(resolved_file)
+        if resolved_path.suffix.lower() != ".py":
+            raise DapPluginError(
+                code=ErrorCode.INVALID_TEST_SELECTOR,
+                message=f"Python target file '{cleaned}' must be a Python (.py) file.",
+                retryable=False,
+                details={"selector": selector},
+            )
+        if not resolved_path.is_file():
+            raise DapPluginError(
+                code=ErrorCode.INVALID_TEST_SELECTOR,
+                message=f"Python target file '{cleaned}' does not exist inside workspace.",
+                retryable=False,
+                details={"selector": selector, "resolved_file": resolved_file},
+            )
+        return {"mode": "program", "target": resolved_file}
+
+    if not _DOTTED_IDENTIFIER_RE.match(cleaned):
+        raise DapPluginError(
+            code=ErrorCode.INVALID_TEST_SELECTOR,
+            message=(
+                f"Invalid python_module target '{selector}'. Expected a Python file path ('src/app.py') "
+                "or dotted module name ('pkg.module')."
+            ),
+            retryable=False,
+            details={"selector": selector},
+        )
+    return {"mode": "module", "target": cleaned}

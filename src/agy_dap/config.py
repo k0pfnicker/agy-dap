@@ -92,7 +92,23 @@ class PluginConfig:
                 justMyCode=True,
                 stopOnUncaughtException=True,
                 stopOnRaisedException=False,
-            )
+            ),
+            "unittest": ProfileConfig(
+                runner="unittest",
+                module="unittest",
+                args=["-v"],
+                justMyCode=True,
+                stopOnUncaughtException=True,
+                stopOnRaisedException=False,
+            ),
+            "python_module": ProfileConfig(
+                runner="python_module",
+                module="",
+                args=[],
+                justMyCode=True,
+                stopOnUncaughtException=True,
+                stopOnRaisedException=False,
+            ),
         }
     )
 
@@ -200,11 +216,29 @@ class PluginConfig:
                 retryable=False,
             )
 
+        supported_runners = {"pytest", "unittest", "python_module"}
         for name, prof in self.profiles.items():
-            if prof.runner != "pytest" or prof.module != "pytest":
+            if prof.runner not in supported_runners:
                 raise DapPluginError(
                     code=ErrorCode.INVALID_CONFIG,
-                    message=f"Profile '{name}' uses unsupported runner/module '{prof.runner}/{prof.module}'. Only 'pytest' is supported in MVP.",
+                    message=(
+                        f"Profile '{name}' uses unsupported runner '{prof.runner}'. "
+                        f"Supported runners: {sorted(supported_runners)}."
+                    ),
+                    retryable=False,
+                    details={"profile": name, "runner": prof.runner, "module": prof.module},
+                )
+            if prof.runner == "pytest" and prof.module != "pytest":
+                raise DapPluginError(
+                    code=ErrorCode.INVALID_CONFIG,
+                    message=f"Profile '{name}' with runner 'pytest' must use module 'pytest' (got '{prof.module}').",
+                    retryable=False,
+                    details={"profile": name, "runner": prof.runner, "module": prof.module},
+                )
+            if prof.runner == "unittest" and prof.module != "unittest":
+                raise DapPluginError(
+                    code=ErrorCode.INVALID_CONFIG,
+                    message=f"Profile '{name}' with runner 'unittest' must use module 'unittest' (got '{prof.module}').",
                     retryable=False,
                     details={"profile": name, "runner": prof.runner, "module": prof.module},
                 )
@@ -364,16 +398,25 @@ def _apply_dict_to_config(cfg: PluginConfig, data: dict[str, Any]) -> None:
             for name, pdata in data["profiles"].items():
                 if not isinstance(pdata, dict):
                     raise ValueError(f"Profile '{name}' must be an object")
-                args_val = pdata.get("args", ["-q", "-s", "--no-header", "--tb=short"])
+                runner_val = str(pdata.get("runner", "pytest"))
+                default_mod = (
+                    "unittest" if runner_val == "unittest" else ("" if runner_val == "python_module" else "pytest")
+                )
+                default_args = (
+                    ["-v"]
+                    if runner_val == "unittest"
+                    else ([] if runner_val == "python_module" else ["-q", "-s", "--no-header", "--tb=short"])
+                )
+                args_val = pdata.get("args", default_args)
                 if not isinstance(args_val, list) or not all(isinstance(x, str) for x in args_val):
                     raise ValueError(f"Profile '{name}' args must be a list of strings")
                 env_val = pdata.get("env", {})
                 if not isinstance(env_val, dict):
                     raise ValueError(f"Profile '{name}' env must be an object")
                 new_profiles[name] = ProfileConfig(
-                    runner=str(pdata.get("runner", "pytest")),
+                    runner=runner_val,
                     pythonPath=pdata.get("pythonPath"),
-                    module=str(pdata.get("module", "pytest")),
+                    module=str(pdata.get("module", default_mod)),
                     cwd=pdata.get("cwd"),
                     args=list(args_val),
                     env={str(k): str(v) for k, v in env_val.items()},

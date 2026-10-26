@@ -68,3 +68,7 @@ def long_running_task(duration_seconds: float = 30.0) -> int:
         time.sleep(0.05)
         ticks += 1
     return ticks
+
+
+if __name__ == "__main__":
+    calculate_total(subtotal=100.0, discount_rate=0.15, customer="gold")

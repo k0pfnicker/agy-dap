@@ -287,3 +287,70 @@ async def test_real_breakpoint_shift_from_comment_line_is_visible(test_config: P
     assert bp["actual_line"] != 38
     assert bp["verified"] is True
     assert snap["location"]["line"] == bp["actual_line"]
+
+
+@pytest.mark.asyncio
+async def test_real_debug_inspect_with_symbol_breakpoint(test_config: PluginConfig) -> None:
+    """Verify debug_inspect resolves a symbol breakpoint (with line_offset) and stops at the exact line."""
+    _require_debugpy()
+    _, manager, _ = create_server(test_config)
+    from agy_dap.tools.inspect import debug_inspect_tool
+
+    snap = await debug_inspect_tool(
+        manager=manager,
+        profile="pytest",
+        test_id="tests/test_checkout.py::test_discount",
+        breakpoint={"file": "src/checkout.py", "symbol": "calculate_total", "line_offset": 13},
+        locals=["subtotal", "discount", "running_total"],
+        timeout_seconds=25.0,
+    )
+    assert snap["state"] == "STOPPED"
+    assert snap["location"]["file"] == "src/checkout.py"
+    assert snap["location"]["line"] == 40
+    assert snap["breakpoints"][0]["requested_symbol"] == "calculate_total"
+    assert snap["breakpoints"][0]["symbol_provider"] in ("agy-lsp", "python-ast")
+    assert snap["locals"]["running_total"]["value"] == 115.0
+    assert snap["session_terminated"] is True
+
+
+@pytest.mark.asyncio
+async def test_real_debug_inspect_unittest_profile(test_config: PluginConfig) -> None:
+    """Verify debug_inspect works end-to-end with the 'unittest' runner profile."""
+    _require_debugpy()
+    _, manager, _ = create_server(test_config)
+    from agy_dap.tools.inspect import debug_inspect_tool
+
+    snap = await debug_inspect_tool(
+        manager=manager,
+        profile="unittest",
+        test_id="tests/test_unittest_checkout.py::TestCheckoutUnittest::test_discount_unittest",
+        breakpoint={"file": "src/checkout.py", "symbol": "calculate_total", "line_offset": 13},
+        locals=["subtotal", "discount", "running_total"],
+        timeout_seconds=25.0,
+    )
+    assert snap["state"] == "STOPPED"
+    assert snap["location"]["line"] == 40
+    assert snap["locals"]["running_total"]["value"] == 115.0
+    assert snap["session_terminated"] is True
+
+
+@pytest.mark.asyncio
+async def test_real_debug_inspect_python_module_profile(test_config: PluginConfig) -> None:
+    """Verify debug_inspect works end-to-end with the 'python_module' runner profile."""
+    _require_debugpy()
+    _, manager, _ = create_server(test_config)
+    from agy_dap.tools.inspect import debug_inspect_tool
+
+    snap = await debug_inspect_tool(
+        manager=manager,
+        profile="python_module",
+        test_id="src/checkout.py",
+        breakpoint={"file": "src/checkout.py", "symbol": "calculate_total", "line_offset": 13},
+        locals=["subtotal", "customer", "running_total"],
+        timeout_seconds=25.0,
+    )
+    assert snap["state"] == "STOPPED"
+    assert snap["location"]["line"] == 40
+    assert snap["locals"]["customer"]["value"] == "gold"
+    assert snap["locals"]["running_total"]["value"] == 115.0
+    assert snap["session_terminated"] is True

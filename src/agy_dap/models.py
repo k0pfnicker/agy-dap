@@ -8,11 +8,15 @@ from typing import Any, Optional
 
 @dataclass
 class BreakpointSpec:
-    """User-requested breakpoint position (1-indexed line)."""
+    """User-requested breakpoint position (1-indexed line or symbol identifier)."""
 
     file: str
-    line: int
+    line: int = 0
     condition: Optional[str] = None
+    symbol: Optional[str] = None
+    line_offset: int = 0
+    resolved_symbol: Optional[str] = None
+    symbol_provider: Optional[str] = None
 
 
 @dataclass
@@ -26,6 +30,8 @@ class BreakpointRecord:
     actual_line: Optional[int] = None
     breakpoint_id: Optional[int] = None
     message: Optional[str] = None
+    requested_symbol: Optional[str] = None
+    symbol_provider: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -34,6 +40,10 @@ class BreakpointRecord:
             "verified": self.verified,
             "actual_line": self.actual_line if self.actual_line is not None else self.requested_line,
         }
+        if self.requested_symbol:
+            payload["requested_symbol"] = self.requested_symbol
+        if self.symbol_provider:
+            payload["symbol_provider"] = self.symbol_provider
         if self.breakpoint_id is not None:
             payload["id"] = self.breakpoint_id
         if self.message:

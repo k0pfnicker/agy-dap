@@ -1,6 +1,7 @@
 # agy-dap — Hypothesengesteuertes Debug Adapter Protocol (DAP) Plugin für Antigravity CLI
 
-[![Tests](https://img.shields.io/badge/tests-34%20passed-brightgreen)](#12-getestete-versionen-plattformen--ci)
+[![Version](https://img.shields.io/badge/version-1.2.0-purple.svg)](#12-getestete-versionen-plattformen--ci)
+[![Tests](https://img.shields.io/badge/tests-40%20passed-brightgreen)](#12-getestete-versionen-plattformen--ci)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)](#12-getestete-versionen-plattformen--ci)
 [![MCP](https://img.shields.io/badge/MCP-compatible-orange)](https://modelcontextprotocol.io)
@@ -341,14 +342,23 @@ Anhand von `subtotal = 100.0`, `discount = 15.0` und `running_total = 115.0` in 
 
 ---
 
-## 9. Zusammenspiel mit `agy-lsp`
+## 9. Zusammenspiel mit `agy-lsp` & Symbol-Breakpoints
 
-- `agy-dap` hat **keine Laufzeitabhängigkeit** von einem laufenden `agy-lsp`-Server; Datei- und Zeilen-Breakpoints funktionieren eigenständig.
-- Wenn ein Agent einen Haltepunkt anhand eines Symbolnamens wählen möchte:
-  1. Über `agy-lsp` (`go_to_definition` oder `document_symbols`) Datei und Deklarationszeile ermitteln.
-  2. Eine ausführbare Zeile im Funktionskörper wählen und `{ "file": ..., "line": ... }` an `agy-dap` übergeben.
-  3. In der Antwort `breakpoints[0].actual_line` und `verified` prüfen, da die `def`-Kopfzeile einer Funktion nicht der Punkt ist, an dem lokale Variablen bereits berechnet sind.
-- Programmatische Schnittstelle: [`src/agy_dap/symbols.py`](src/agy_dap/symbols.py) definiert das `SymbolResolver`-Protokoll ohne fehleranfällige Regex-Parser.
+- **Direkte Symbol-Breakpoints (`symbol` + `line_offset`):** Haltepunkte in `debug_inspect` und `debug_start` können direkt über den Funktions-, Methoden- oder Klassennamen gesetzt werden:
+  ```json
+  {
+    "profile": "pytest",
+    "test_id": "tests/test_checkout.py::test_discount",
+    "breakpoint": {
+      "file": "src/checkout.py",
+      "symbol": "calculate_total",
+      "line_offset": 13
+    },
+    "locals": ["subtotal", "discount", "running_total"]
+  }
+  ```
+- **Intelligente Funktionskörper-Auflösung:** [`src/agy_dap/symbols.py`](src/agy_dap/symbols.py) implementiert den `CompositeSymbolResolver`, der den schnellen `PythonAstSymbolResolver` mit dem `AgyLspSymbolResolver` (Anbindung an das Companion-Plugin [**agy-lsp**](https://github.com/k0pfnicker/agy-lsp)) kombiniert. Statt auf der `def`-Kopfzeile (die bereits beim Modul-Import ausgeführt wird) landet der Breakpoint automatisch auf der **ersten ausführbaren Anweisung im Funktionskörper** (nach etwaigen Docstrings) plus optionalem `line_offset`.
+- **Integrierte Runner-Profile (`pytest`, `unittest`, `python_module`):** Neben `pytest` unterstützt `agy-dap` standardmäßig `unittest`-Testsuites (`profile="unittest"`) sowie direkte Python-Skripte und Module (`profile="python_module"`).
 
 ---
 

@@ -5,6 +5,13 @@ All notable changes to **agy-dap** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-10-26
+
+### Added
+- **Built-in `unittest` and `python_module` Launch Profiles:** Added first-class support for standard library `unittest` (`profile="unittest"`, accepting both dotted `tests.test_mod.TestClass.test_method` and `pytest`-style `tests/test_mod.py::TestClass::test_method` selectors) and standalone Python modules/scripts (`profile="python_module"`, accepting workspace `.py` scripts or dotted module names).
+- **Direct Symbol Breakpoints (`symbol` & `line_offset`) with `agy-lsp` Integration:** Implemented `PythonAstSymbolResolver`, `AgyLspSymbolResolver` (connecting directly to companion plugin [`agy-lsp`](https://github.com/k0pfnicker/agy-lsp)), and `CompositeSymbolResolver` in `src/agy_dap/symbols.py`. Breakpoints in `debug_inspect` and `debug_start` can now be specified by function/method symbol name (e.g. `{"file": "src/checkout.py", "symbol": "calculate_total", "line_offset": 13}`), automatically resolving to the first executable statement inside the function body (skipping docstrings).
+- **Expanded Verification Suite:** Added unit and end-to-end `debugpy` tests covering symbol breakpoints, `unittest` profile execution, and `python_module` execution (40 automated tests total).
+
 ## [1.1.0] - 2026-10-26
 
 ### Changed

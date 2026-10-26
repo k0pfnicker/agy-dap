@@ -414,6 +414,8 @@ class DapClient:
                     actual_line=actual_line,
                     breakpoint_id=bp_id,
                     message=msg,
+                    requested_symbol=spec.resolved_symbol or spec.symbol,
+                    symbol_provider=spec.symbol_provider,
                 )
                 rec._file_line_count = file_lines
                 records.append(rec)

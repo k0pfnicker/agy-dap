@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agy-dap"
-version = "1.1.0"
+version = "1.2.0"
 description = "Hypothesis-driven Debug Adapter Protocol (DAP) MCP Plugin for Antigravity CLI"
 readme = "README.md"
 requires-python = ">=3.10"

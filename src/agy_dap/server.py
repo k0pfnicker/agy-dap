@@ -43,10 +43,10 @@ def create_server(
 
     app = MCPServer(
         name="agy-dap",
-        version="1.1.0",
+        version="1.2.0",
         description=(
             "Hypothesis-driven Debug Adapter Protocol (DAP) plugin for Antigravity CLI. "
-            "Runs local pytest tests under debugpy to capture compact runtime snapshots at breakpoints or exceptions."
+            "Runs local pytest, unittest, or Python module targets under debugpy to capture compact runtime snapshots at line or symbol breakpoints."
         ),
     )
 
@@ -72,9 +72,10 @@ def create_server(
     @app.tool(
         name="debug_inspect",
         description=(
-            "Primary one-shot debugging investigation tool. Launches a pytest test under debugpy, "
-            "configures a line breakpoint, waits for the first stop (breakpoint or exception), "
-            "returns a compact runtime snapshot (stack, filtered locals, output tail), and reliably cleans up."
+            "Primary one-shot debugging investigation tool. Launches a target under debugpy using a named profile "
+            "('pytest', 'unittest', or 'python_module'), configures line or symbol breakpoints "
+            "({'file': ..., 'line': ...} or {'file': ..., 'symbol': ..., 'line_offset': ...}), waits for the first stop "
+            "(breakpoint or exception), returns a compact runtime snapshot (stack, filtered locals, output tail), and reliably cleans up."
         ),
     )
     async def debug_inspect(
@@ -108,9 +109,9 @@ def create_server(
     @app.tool(
         name="debug_start",
         description=(
-            "Start a stateful debugging session for multi-step investigation. Launches the test under debugpy, "
-            "stops at the first breakpoint or exception, returns the session_id and initial snapshot, "
-            "and keeps the session paused for follow-up debug_snapshot, debug_continue, or debug_stop calls."
+            "Start a stateful debugging session for multi-step investigation. Launches the target under debugpy "
+            "('pytest', 'unittest', or 'python_module'), stops at the first line/symbol breakpoint or exception, "
+            "returns the session_id and initial snapshot, and keeps the session paused for follow-up debug_snapshot, debug_continue, or debug_stop calls."
         ),
     )
     async def debug_start(

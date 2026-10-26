@@ -25,12 +25,12 @@ This skill guides the agent in using `agy-dap` MCP tools to inspect real runtime
 1. **State the Failing Test & Hypothesis**:
    Name the exact pytest selector (e.g., `tests/test_checkout.py::test_discount`) and state what you expect vs. suspect at runtime (e.g., *"Hypothesis: `running_total` adds `discount` instead of subtracting it at line 40"*).
 2. **Select the Breakpoint & Minimal Locals**:
-   - Choose an executable line inside the workspace where the relevant variables are in scope.
-   - If you only know a function name, you may optionally use `agy-lsp` (`go_to_definition` or `document_symbols`) first to locate the file and declaration line, then place the breakpoint on the first **executable statement** inside the function body.
-   - Note that a declaration line (`def ...:`) is not always where local variables are already computed; always check `breakpoints[0].actual_line` and `verified` in the returned snapshot.
+   - Choose an executable line inside the workspace where the relevant variables are in scope (`{"file": "src/checkout.py", "line": 40}`), **or** specify a function/method symbol directly with an optional statement offset (`{"file": "src/checkout.py", "symbol": "calculate_total", "line_offset": 13}`).
+   - When using `"symbol"`, `agy-dap` resolves the symbol via Python AST or companion plugin `agy-lsp` directly to the **first executable statement** inside the function body (skipping docstrings), and adds `line_offset` if provided.
+   - Always check `breakpoints[0].actual_line` and `verified` in the returned snapshot.
    - Request **only the specific variable names** needed to test your hypothesis via `locals=["subtotal", "discount", "running_total"]`.
 3. **Prefer One-Shot `debug_inspect` Over Multi-Step Stepping**:
-   Call `debug_inspect` first:
+   Call `debug_inspect` first (supports `profile="pytest"`, `"unittest"`, or `"python_module"`):
    ```json
    {
      "profile": "pytest",

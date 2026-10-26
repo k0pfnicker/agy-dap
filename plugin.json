@@ -1,5 +1,5 @@
 {
   "name": "agy-dap",
-  "description": "Hypothesis-driven Debug Adapter Protocol (DAP) Plugin for Antigravity CLI. Runs local pytest tests under debugpy and captures compact runtime snapshots at breakpoints or exceptions via MCP.",
-  "version": "1.1.0"
+  "description": "Hypothesis-driven Debug Adapter Protocol (DAP) Plugin for Antigravity CLI. Runs local pytest, unittest, or Python modules under debugpy and captures compact runtime snapshots at line or symbol breakpoints via MCP.",
+  "version": "1.2.0"
 }

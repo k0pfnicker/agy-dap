@@ -1,6 +1,7 @@
 # agy-dap — Hypothesis-Driven Debug Adapter Protocol (DAP) Plugin for Antigravity CLI
 
-[![Tests](https://img.shields.io/badge/tests-34%20passed-brightgreen)](#12-tested-versions-platforms--ci)
+[![Version](https://img.shields.io/badge/version-1.2.0-purple.svg)](#12-tested-versions-platforms--ci)
+[![Tests](https://img.shields.io/badge/tests-40%20passed-brightgreen)](#12-tested-versions-platforms--ci)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)](#12-tested-versions-platforms--ci)
 [![MCP](https://img.shields.io/badge/MCP-compatible-orange)](https://modelcontextprotocol.io)
@@ -341,14 +342,23 @@ The snapshot immediately shows `subtotal = 100.0`, `discount = 15.0`, and `runni
 
 ---
 
-## 9. Collaboration with `agy-lsp`
+## 9. Collaboration with `agy-lsp` & Symbol Breakpoints
 
-- `agy-dap` has **no runtime dependency** on a running `agy-lsp` server; file and line breakpoints work standalone.
-- When an agent wants to place a breakpoint by symbol name, the recommended workflow is:
-  1. Query `go_to_definition` or `document_symbols` in `agy-lsp` to find the file and declaration line.
-  2. Choose an executable line inside the function body and pass `{ "file": ..., "line": ... }` to `agy-dap`.
-  3. Inspect `breakpoints[0].actual_line` and `verified` in the `agy-dap` response, as a function's `def` header line is distinct from the lines where local variables are assigned.
-- Programmatic extension point: [`src/agy_dap/symbols.py`](src/agy_dap/symbols.py) defines the `SymbolResolver` protocol for optional future symbol resolution without regex heuristics.
+- **Direct Symbol Breakpoints (`symbol` + `line_offset`):** You can set breakpoints directly by function, method, or class symbol name in `debug_inspect` and `debug_start`:
+  ```json
+  {
+    "profile": "pytest",
+    "test_id": "tests/test_checkout.py::test_discount",
+    "breakpoint": {
+      "file": "src/checkout.py",
+      "symbol": "calculate_total",
+      "line_offset": 13
+    },
+    "locals": ["subtotal", "discount", "running_total"]
+  }
+  ```
+- **Smart Function-Body Resolution:** [`src/agy_dap/symbols.py`](src/agy_dap/symbols.py) implements `CompositeSymbolResolver`, combining instant `PythonAstSymbolResolver` with `AgyLspSymbolResolver` (backed by companion plugin [**agy-lsp**](https://github.com/k0pfnicker/agy-lsp)). Instead of binding to the `def` header line (which executes at module import time), symbol resolution automatically targets the **first executable statement inside the function body** (skipping docstrings) and applies `line_offset` from there.
+- **Built-in Launch Profiles (`pytest`, `unittest`, `python_module`):** Beyond `pytest`, `agy-dap` includes pre-configured profiles for standard library `unittest` (`profile="unittest"`) and standalone scripts/modules (`profile="python_module"`).
 
 ---
 

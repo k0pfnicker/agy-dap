@@ -6,7 +6,9 @@ from typing import Any, Optional
 
 from agy_dap.errors import DapPluginError, ErrorCode
 from agy_dap.sessions.manager import SessionManager
-from agy_dap.tools.inspect import parse_breakpoint_input
+from agy_dap.symbols import CompositeSymbolResolver
+from agy_dap.tools.inspect import parse_breakpoint_input, resolve_breakpoint_specs
+from agy_dap.utils.paths import find_workspace_root
 
 
 async def debug_start_tool(
@@ -20,13 +22,20 @@ async def debug_start_tool(
     include_snippet: Optional[bool] = None,
 ) -> dict[str, Any]:
     """Start an interactive debugging session, wait for the first stop, and keep the session open for follow-up calls."""
-    bp_specs = parse_breakpoint_input(breakpoint_arg=breakpoint, breakpoints_arg=breakpoints)
+    raw_specs = parse_breakpoint_input(breakpoint_arg=breakpoint, breakpoints_arg=breakpoints)
     if locals is not None and (not isinstance(locals, list) or not all(isinstance(x, str) for x in locals)):
         raise DapPluginError(
             code=ErrorCode.INVALID_CONFIG,
             message="'locals' must be a list of variable name strings.",
             retryable=False,
         )
+
+    ws_root = manager.config.workspaceRoot or find_workspace_root()
+    resolver = CompositeSymbolResolver(
+        workspace_root=ws_root,
+        allow_outside=manager.config.allowOutsideWorkspace,
+    )
+    bp_specs = await resolve_breakpoint_specs(raw_specs, resolver=resolver, workspace_root=ws_root)
 
     session = await manager.create_session(profile_name=profile, test_id=test_id)
     try:

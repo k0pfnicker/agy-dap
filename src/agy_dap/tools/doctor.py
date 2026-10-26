@@ -97,6 +97,7 @@ async def debug_doctor_tool(
     env = build_sanitized_env(extra_allowlist=config.envAllowlist)
 
     py_info = await _probe_python_version(interpreter, env)
+    pytest_required = prof_cfg is None or prof_cfg.runner == "pytest"
     if not py_info["available"]:
         remediations.append(
             f"Ensure Python interpreter exists at '{interpreter}' or configure 'pythonPath' in agy-dap.json."
@@ -110,7 +111,7 @@ async def debug_doctor_tool(
         )
         if not debugpy_info["available"]:
             remediations.append(f'Install debugpy in target interpreter: "{interpreter}" -m pip install debugpy')
-        if not pytest_info["available"]:
+        if pytest_required and not pytest_info["available"]:
             remediations.append(f'Install pytest in target interpreter: "{interpreter}" -m pip install pytest')
 
     profiles_summary: dict[str, Any] = {}
@@ -124,7 +125,11 @@ async def debug_doctor_tool(
         }
 
     healthy = bool(
-        config_valid and ws_exists and py_info["available"] and debugpy_info["available"] and pytest_info["available"]
+        config_valid
+        and ws_exists
+        and py_info["available"]
+        and debugpy_info["available"]
+        and (pytest_info["available"] or not pytest_required)
     )
 
     result: dict[str, Any] = {

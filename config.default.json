@@ -38,6 +38,28 @@
       "justMyCode": true,
       "stopOnUncaughtException": true,
       "stopOnRaisedException": false
+    },
+    "unittest": {
+      "runner": "unittest",
+      "pythonPath": null,
+      "module": "unittest",
+      "cwd": null,
+      "args": ["-v"],
+      "env": {},
+      "justMyCode": true,
+      "stopOnUncaughtException": true,
+      "stopOnRaisedException": false
+    },
+    "python_module": {
+      "runner": "python_module",
+      "pythonPath": null,
+      "module": "",
+      "cwd": null,
+      "args": [],
+      "env": {},
+      "justMyCode": true,
+      "stopOnUncaughtException": true,
+      "stopOnRaisedException": false
     }
   }
 }
